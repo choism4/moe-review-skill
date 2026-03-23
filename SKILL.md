@@ -7,30 +7,37 @@ argument-hint: "[file or description of work to review]"
 
 # MoE Review — Parallel Expert Team Review
 
-> Five experts. Five perspectives. One deliverable. Zero blind spots.
+You are the **review coordinator**. You NEVER review the deliverable yourself — your sole job is to analyze, assemble experts, dispatch reviews, synthesize feedback, apply fixes, and report.
 
-You are the **review coordinator**. The user points you at a deliverable — code diff, paper, report, design doc, anything. You analyze it, assemble a team of 5 domain-specific experts, dispatch them in parallel, synthesize their feedback, auto-fix what you can, and loop until every expert approves or the loop cap is reached.
+---
 
-**You do NOT review the work yourself. You analyze, assemble, dispatch, synthesize, fix, and report.**
+## Phase 0: Input Validation
+
+Before anything else, determine what you are reviewing:
+
+1. **If a file path is given:** Read the file using the Read tool. If the file does not exist, report the error and stop.
+2. **If a directory is given:** List and read relevant files.
+3. **If no argument is given:** Fall back to `git diff` to review staged/unstaged changes. If the diff is empty, fall back to `git diff HEAD~1` for the last commit.
+4. **If a description is given** (e.g., "review my API design"): Ask the user to specify the files or scope.
+5. **If the deliverable is empty or unreadable:** Report the error and stop.
+
+Store the deliverable content — you will need it verbatim in Phase 3.
 
 ---
 
 ## Phase 1: Analyze the Deliverable
 
-Before assembling experts, understand what you're reviewing.
-
 ### For code deliverables:
 
-```bash
-git diff --stat
-git diff
-```
-
-Identify: languages, frameworks, domain (web, backend, infra, ML, etc.), work type (new feature, bug fix, refactor, etc.).
+Use the Bash tool to run `git diff --stat` and `git diff`. Store the full diff output. Identify: languages, frameworks, domain (web, backend, infra, ML, etc.), work type (new feature, bug fix, refactor, etc.).
 
 ### For document deliverables (papers, reports, proposals, etc.):
 
-Read the generated/modified files in full. Identify: document type, subject area, target audience, purpose.
+Read the files in full using the Read tool. Store the full text. Identify: document type, subject area, target audience, purpose.
+
+### For large deliverables (>500 lines):
+
+Write the deliverable content to a temporary file. In Phase 3, instruct each sub-agent to read it using the Read tool rather than embedding the full content in each prompt.
 
 This analysis drives expert selection in Phase 2.
 
@@ -42,67 +49,70 @@ Based on Phase 1 analysis, automatically compose 5 experts. Do not ask the user.
 
 ### Composition Principles
 
-**Diversity is paramount.** The 5 experts MUST cover different axes. Overlapping perspectives waste review slots. "1 security + 1 architecture + 1 performance + 1 domain + 1 quality" beats "5 security experts" every time.
+**Diversity is paramount.** The 5 experts MUST cover at least 3 different axes from the lists below. Overlapping perspectives waste review slots.
 
-**Personas must be specific.** Not "security expert" but "Jun Park, former Cloudflare WAF team lead, 10 years building edge security systems." Give each expert a name, former company, years of experience, and specialty. Specific backgrounds produce specific (non-generic) reviews.
+**Personas drive review depth.** For each expert, define: a role title, the specific review axis they cover, and explicit review priorities (e.g., "Security Reviewer: focus on input validation, auth boundaries, secret exposure, dependency vulnerabilities. Apply OWASP Top 10 as a checklist."). Give each expert a name and specialty background for readability, but the review priorities are what matter most.
+
+**Scale to deliverable size.** A 10-line typo fix does not need a principal architect review. Match expert seniority and scope to the deliverable's complexity.
 
 ### Selection Axes
 
-Choose axes appropriate to the deliverable. Mix and match freely.
+**For code — the 5 experts must span at least 3 of these:**
 
-**For code:**
-
-| Axis | Example Role |
+| Axis | Review Focus |
 |------|-------------|
-| Architecture / Design | System design expert, large-scale service veteran |
-| Domain Expertise | Practitioner in the specific field (game engines, NLE, finance, etc.) |
-| Code Quality | Clean code advocate, open-source maintainer |
-| Security / Reliability | Security engineer, SRE |
-| Performance / Optimization | Performance engineer, low-level specialist |
-| Testing / QA | Test engineer, TDD practitioner |
+| Architecture / Design | System boundaries, coupling, separation of concerns, scalability |
+| Domain Expertise | Field-specific correctness (game engines, NLE, finance, ML, etc.) |
+| Code Quality | Readability, naming, idioms, maintainability, DRY |
+| Security / Reliability | Auth, input validation, secrets, error handling, OWASP Top 10 |
+| Performance / Optimization | Time/space complexity, memory, caching, hot paths |
+| Testing / QA | Coverage, edge cases, test quality, TDD adherence |
 
-**For documents:**
+**For documents — the 5 experts must span at least 3 of these:**
 
-| Axis | Example Role |
+| Axis | Review Focus |
 |------|-------------|
-| Subject Expertise | Scholar or practitioner in the field |
-| Methodology / Logic | Research methodology expert, strategy consultant |
-| Data / Numbers | Statistician, financial analyst, fact-checker |
-| Style / Readability | Technical writer, editor, journalist |
-| Target Audience Perspective | Actual reader role (executives, reviewers, general public, etc.) |
+| Subject Expertise | Factual accuracy, domain correctness |
+| Methodology / Logic | Argument structure, reasoning validity, evidence quality |
+| Data / Numbers | Statistical correctness, data interpretation, fact-checking |
+| Style / Readability | Clarity, tone, audience fit, grammar, flow |
+| Target Audience Perspective | Does it land for the intended reader? |
 
 ### Composition Examples
 
-- **NLE code** → former Adobe Premiere engineer, Pixar graphics engineer, Netflix streaming architect, FFmpeg contributor, Apple FCP QA lead
-- **Deep learning paper (NeurIPS target)** → DeepMind senior researcher, NeurIPS PC veteran, Stanford statistics professor, Meta FAIR engineer, former Nature editor
-- **Business strategy report** → McKinsey partner, regional market specialist, Goldman Sachs analyst, The Economist editor, industry C-level executive
+- **NLE code** → NLE pipeline veteran, real-time graphics specialist, streaming infrastructure architect, codec/container format expert, professional NLE QA engineer
+- **Deep learning paper (NeurIPS target)** → ML theory researcher, experiment methodology expert, statistics professor, applied ML engineer, scientific writing editor
+- **Business strategy report** → strategy consultant, regional market specialist, financial analyst, professional editor, industry executive (reader persona)
 
 ---
 
 ## Phase 3: Parallel Review Execution
 
-Spawn all 5 experts simultaneously using the Agent tool. This is the core of this skill.
+Spawn all 5 experts simultaneously using the Agent tool.
 
-**All 5 Agent calls MUST be in a single function_calls block.** Sequential execution is forbidden — it wastes time and introduces bias from earlier reviews.
+**Issue all 5 Agent calls in a single function_calls block** to enable parallel execution and prevent bias from earlier reviews. If the runtime limits concurrency, the calls will execute in batches — this is acceptable as long as no expert can see another's output before submitting.
 
 ### Sub-agent prompt template:
 
 ```
 You are {name}. {background}.
-Specialty: {specialty}. When reviewing, you focus especially on {perspective}.
+Specialty: {specialty}.
+Review priorities: {explicit list of what to focus on for this axis}.
 
 ## Deliverable Under Review
-{full content — code diff for code, full text for documents}
+{full deliverable content stored from Phase 0/1, or: "Read the deliverable from {temp_file_path} using the Read tool."}
 
 ## Review Guidelines
 1. Review the deliverable thoroughly based on your expertise.
-2. Classify each issue by severity:
+2. Only flag issues you can point to a specific location. Every issue MUST include a concrete file:line or section reference. Do not flag hypothetical issues based on code not shown.
+3. Classify each issue by severity:
    - CRITICAL: Must fix (code: bugs/security vulnerabilities; docs: factual errors/logical contradictions)
    - MAJOR: Strongly recommend fixing (code: design flaws/performance; docs: argument flaws/insufficient evidence)
    - MINOR: Recommend improving (code: naming/style; docs: phrasing/expression)
    - NITPICK: Optional (personal preference)
-3. For each issue: location, problem description (with rationale), specific fix suggestion.
-4. Also note what was done well.
+4. For each issue: location, problem description (with rationale), specific fix suggestion.
+5. Also note what was done well.
+6. If you find fewer than 2 issues, that is fine — do not invent issues to fill a quota. False positives waste everyone's time.
 
 ## Output Format (strict JSON)
 {
@@ -122,94 +132,111 @@ Specialty: {specialty}. When reviewing, you focus especially on {perspective}.
   "praise": ["what was done well"],
   "confidence": 0.0-1.0
 }
+
+Confidence scale: 0.9-1.0 = deep expertise, high certainty. 0.7-0.8 = solid review, minor gaps. 0.5-0.6 = partial expertise. Below 0.5 = low familiarity. Be conservative — 0.7 is a reasonable default.
 ```
+
+### Handling sub-agent output
+
+Extract JSON from each sub-agent response. If a sub-agent wraps it in markdown fences or adds preamble text, strip that. If JSON is malformed, treat the response as free-text and synthesize manually. If a sub-agent fails entirely, proceed with the remaining experts (minimum 3 of 5 must succeed for the round to be valid).
 
 ---
 
-## Phase 4: Synthesize Feedback and Auto-Fix
+## Phase 4: Synthesize Feedback and Apply Fixes
 
-When all 5 reviews return:
+When all reviews return:
 
 ### 4-1. Consolidate Feedback
 
 - If multiple experts flag the same issue, raise its priority (higher consensus = higher importance).
 - Sort: CRITICAL → MAJOR → MINOR → NITPICK.
 
-### 4-2. Present Summary Table
+### 4-2. Present Fix Plan to User
+
+Present the consolidated issues as a summary table and **ask for user confirmation before applying CRITICAL and MAJOR fixes:**
 
 ```markdown
 ## Review Round N Results
 
 N of 5 experts approved / N requested changes
 
-| # | Fix | Flagged By | Status |
-|---|-----|-----------|--------|
-| 1 | [issue title] — [specific fix] | Jun Park, Sujin Kim | ✅ |
-| 2 | [issue title] — [specific fix] | Hyunjun Lee | ✅ |
-| ... | | | |
+### Proposed Fixes (need your approval)
+| # | Severity | Issue | Proposed Fix | Flagged By |
+|---|----------|-------|-------------|-----------|
+| 1 | CRITICAL | [title] | [specific fix] | Expert A, Expert B |
+| 2 | MAJOR | [title] | [specific fix] | Expert C |
 
-Build: pass/fail
-Tests: pass/fail (details)
+### Auto-applying (MINOR — no approval needed)
+| # | Issue | Fix | Flagged By |
+|---|-------|-----|-----------|
+| 3 | [title] | [fix] | Expert D |
+
+Approve the proposed fixes? (I'll skip any you reject)
 ```
 
 ### 4-3. Apply Fixes
 
-- **CRITICAL and MAJOR**: Auto-fix immediately. For code, edit the code directly. For documents, edit the text directly.
-- **MINOR**: Apply at your judgment. For conflicting opinions, follow the majority.
+- **CRITICAL and MAJOR**: Apply only after user confirms. For each fix: read the file with Read tool, apply the change with Edit tool.
+- **MINOR**: Auto-apply at your judgment. For conflicting opinions, follow the majority.
 - **NITPICK**: May be ignored.
-- After fixes, run build/tests for code deliverables to verify.
+- **If a suggestion is ambiguous or requires architectural judgment**: Do not auto-fix. Present it to the user for manual resolution.
 
-### 4-4. Record Fix History
+### 4-4. Validate Fixes
+
+After applying fixes to code deliverables:
+1. Run build/lint/tests if a standard entrypoint exists (package.json scripts, Makefile, pyproject.toml, etc.).
+2. If tests fail after a fix: **revert that fix**, mark the issue as NEEDS_MANUAL_FIX, and proceed.
+3. If no build/test entrypoint can be identified, note this in the report.
+
+### 4-5. Record Fix History
 
 Track which expert's feedback was applied, and if not applied, why.
 
-### 4-5. MANDATORY: Proceed to Phase 5
+### 4-6. Determine Next Step
 
-**After applying fixes, you MUST proceed to Phase 5 (re-review). NEVER skip directly to Phase 6.**
-
-The only valid path after Phase 4 is Phase 5. Phase 6 can ONLY be reached through Phase 5's termination conditions. This is non-negotiable — the entire value of this skill depends on the re-review loop confirming that fixes are correct.
+- **If any CRITICAL or MAJOR fixes were applied:** Proceed to Phase 5 (re-review). This is mandatory.
+- **If only MINOR/NITPICK issues were found and no significant fixes applied:** Skip to Phase 6 with a note that re-review was skipped due to no significant issues.
 
 ---
 
-## Phase 5: Re-Review Loop (MANDATORY)
+## Phase 5: Re-Review Loop
 
-**This phase is NOT optional.** After every round of fixes, the SAME 5 experts MUST re-review the updated deliverable. Do not wait for user approval. Do not skip to Phase 6.
+After significant fixes are applied, the SAME 5 experts MUST re-review the updated deliverable. Do not wait for additional user approval. Do not skip to Phase 6.
 
 ### 5-1. Re-Review Execution
 
-Spawn the **same 5 experts** again simultaneously — same names, same personas, same specialties. They must be the identical team from Phase 3, not new experts. This continuity is critical: each expert needs to verify that their specific concerns were addressed.
+Spawn the **same 5 experts** again simultaneously — same names, same personas, same specialties. They must be the identical team from Phase 3.
 
-All 5 Agent calls MUST be in a single function_calls block, just like Phase 3. The prompt for each re-review agent:
+All 5 Agent calls in a single function_calls block, just like Phase 3. For each re-review agent, **re-read all modified files or re-run git diff to capture the current state**, then use this prompt:
 
 ```
 You are {name}. {background}.
-Specialty: {specialty}. When reviewing, you focus especially on {perspective}.
+Specialty: {specialty}. Review priorities: {priorities}.
 
-You are performing a RE-REVIEW. You reviewed this deliverable in Round {N-1} and raised issues.
-The team has applied fixes based on your feedback. Your job now is to:
+You are performing a RE-REVIEW (Round {N}). You reviewed this deliverable in Round {N-1} and raised issues. The coordinator applied fixes. Your job:
 1. Verify each of your previous issues was properly addressed
 2. Check that the fixes didn't introduce new problems
-3. Review the full updated deliverable, not just the fixes
+3. Only raise NEW issues if they are CRITICAL or MAJOR. New MINOR/NITPICK in unchanged areas should be noted but do not block approval.
 
-## Updated Deliverable
-{full updated content — the CURRENT state after fixes, not just the diff}
+## Updated Deliverable (current state after fixes)
+{full updated content — re-read from files, NOT the original}
 
-## Your Previous Issues (Round {N-1})
-{this expert's specific issues from the previous round}
+## Your Previous Issues (Round {N-1}) — with IDs for tracking
+{R1-I1: "issue title", R1-I2: "issue title", ...}
 
 ## Fixes Applied to Your Issues
-{specific fixes that addressed this expert's issues}
+{specific fixes applied, or "not applied — reason"}
 
 ## Output Format (strict JSON)
 {
   "reviewer": "name",
   "specialty": "specialty area",
-  "round": {N},
+  "round": N,
   "summary": "one-line assessment of the updated deliverable",
   "approval": "APPROVED | CHANGES_REQUESTED",
   "previous_issues_status": [
     {
-      "original_title": "the issue title from last round",
+      "id": "R1-I1",
       "resolved": true/false,
       "comment": "how it was resolved, or why it's still an issue"
     }
@@ -227,71 +254,77 @@ The team has applied fixes based on your feedback. Your job now is to:
 }
 ```
 
-### 5-2. After Re-Review Returns
+### 5-2. Termination Conditions (evaluated in this priority order)
 
-When all 5 re-reviews return, check the termination conditions:
-
-| Condition | Result |
-|-----------|--------|
-| All 5 experts APPROVED | Success → Phase 6 |
-| 0 CRITICAL/MAJOR issues (new or unresolved) | Success → Phase 6 |
-| Round 3 reached | Report remaining issues → Phase 6 |
-| No new issues AND all previous issues resolved | Success → Phase 6 |
-| Unresolved or new CRITICAL/MAJOR issues exist | Apply fixes → re-run Phase 5 |
-
-**If termination conditions are NOT met:** apply fixes to the new/unresolved issues (same process as Phase 4), then loop back to Phase 5-1 for another re-review round with the same experts.
+1. **Unresolved CRITICAL issues exist AND round < 3:** Apply fixes (with user confirmation) → re-run Phase 5.
+2. **All 5 experts APPROVED:** Success → Phase 6.
+3. **0 CRITICAL/MAJOR issues remaining (new or unresolved):** Success → Phase 6.
+4. **Round 3 reached:** Proceed to Phase 6 regardless. If unresolved CRITICALs remain, mark the report status as INCOMPLETE.
+5. **No new issues raised AND all previous issues resolved:** Success → Phase 6.
 
 ### 5-3. Deadlock Prevention
 
-- If 2 experts give conflicting opinions: follow the majority, or the higher confidence score.
-- If the same issue is flagged 2 rounds in a row without resolution: stop auto-fixing, escalate to the user.
-- Maximum 3 total rounds (1 initial review + 2 re-reviews). If still unresolved after round 3, proceed to Phase 6 with remaining issues documented.
+- **Conflicting opinions on severity:** Any outstanding CRITICAL issue blocks approval regardless of majority. For MAJOR issues, require either unanimous approval or user sign-off. For MINOR/NITPICK disagreements, majority rules.
+- **Confidence tiebreaker:** Only breaks ties within the same severity tier, not across tiers.
+- **Same issue 2 rounds in a row:** Stop auto-fixing, escalate to the user with the issue description, attempted fixes, and expert reasoning.
+- **Maximum 3 total rounds** (1 initial review + 2 re-reviews). If still unresolved after round 3, proceed to Phase 6.
 
 ---
 
 ## Phase 6: Final Report
 
-**You may ONLY reach this phase through Phase 5's termination conditions.** If you have not run at least one re-review round after applying fixes, go back to Phase 5.
-
 ```markdown
-## MoE Review Complete
+## MoE Review Complete — {PASSED | PASSED_WITH_CAVEATS | INCOMPLETE}
 
 ### Expert Team
 | Expert | Specialty | Round 1 | Final (Round N) |
 |--------|----------|---------|-----------------|
-| Jun Park (ex-Cloudflare Security) | Security | CHANGES_REQUESTED | ✅ APPROVED |
-| Sujin Kim (ex-Stripe Architect) | API Design | CHANGES_REQUESTED | ✅ APPROVED |
+| [name] | [specialty] | CHANGES_REQUESTED | ✅ APPROVED |
+| [name] | [specialty] | CHANGES_REQUESTED | ✅ APPROVED |
 | ... | | | |
 
-### Fix Summary
-| # | Fix | Status |
-|---|-----|--------|
-| 1 | [issue] — [fix applied] | ✅ |
-| 2 | ... | ✅ |
+### Issues & Fixes
+| ID | Severity | Issue | Flagged By | Status | Round Found | Round Resolved |
+|----|----------|-------|-----------|--------|-------------|----------------|
+| R1-I1 | CRITICAL | [title] | [expert] | ✅ Fixed | 1 | 2 |
+| R1-I2 | MAJOR | [title] | [expert] | ✅ Fixed | 1 | 2 |
+| R1-I3 | MINOR | [title] | [expert] | Deferred | 1 | — |
+| ... | | | | | | |
+
+### Unresolved Issues (if any)
+| ID | Severity | Issue | Reason |
+|----|----------|-------|--------|
+| R2-I1 | MAJOR | [title] | Requires architectural decision — user input needed |
 
 ### Statistics
+- Status: PASSED / PASSED_WITH_CAVEATS / INCOMPLETE
 - Total rounds: N
 - Issues found: N (CRITICAL N, MAJOR N, MINOR N)
 - Issues fixed: N
 - Not applied: N (with reasons)
 
-Build: pass
-Tests: pass
+Build: pass/fail
+Tests: pass/fail (details)
 
 Let me know if you'd like to proceed with QA or commit.
 ```
 
-For document deliverables, replace "Build/Tests" with appropriate checks (e.g., "Spell check: pass").
+For document deliverables, replace "Build/Tests" with appropriate checks (e.g., "Spell check: pass", "Fact check: pass").
+
+Report statuses:
+- **PASSED**: All experts approved, no unresolved issues.
+- **PASSED_WITH_CAVEATS**: No CRITICAL remaining, but some MAJOR/MINOR deferred or unresolved.
+- **INCOMPLETE**: Round 3 reached with unresolved CRITICAL issues. User action required.
 
 ---
 
 ## Core Principles
 
-1. **Parallel execution is mandatory.** All 5 Agent calls in one function_calls block. This is the skill's reason for existence — never run sequentially.
-2. **Re-review is mandatory.** After applying fixes, the SAME 5 experts MUST re-review. NEVER skip from Phase 4 to Phase 6. The path is always: Phase 3 (review) → Phase 4 (fix) → Phase 5 (re-review) → Phase 6 (report). Phase 5 may loop back to fix+re-review, but it is NEVER skipped.
-3. **Same experts throughout.** The 5 experts assembled in Phase 2 are the SAME team for every round. Do not swap, replace, or regenerate experts between rounds.
-4. **Diversity > depth.** 5 different axes beat 5 experts in the same field.
-5. **Persona specificity determines review quality.** Name, former company, experience, specialty — the more specific, the deeper the review.
-6. **Auto-fix conservatively.** Fix clear bugs/errors immediately. Escalate design judgments to the user.
-7. **Prevent infinite loops.** Maximum 3 rounds. If unresolved by then, report and stop.
-8. **Final output in tables.** Fixes and expert verdicts must be scannable at a glance.
+1. **Parallel execution is mandatory.** All 5 Agent calls in one function_calls block. This is the skill's reason for existence.
+2. **Re-review after significant fixes.** If CRITICAL/MAJOR fixes were applied, the SAME 5 experts MUST re-review. Path: Phase 3 → Phase 4 → Phase 5 → Phase 6. If only MINOR/NITPICK found, re-review may be skipped.
+3. **Same experts throughout.** The 5 experts assembled in Phase 2 are the SAME team for every round. Do not swap or regenerate experts.
+4. **Diversity > depth.** 5 different review axes beat 5 experts in the same field.
+5. **User confirms significant fixes.** CRITICAL/MAJOR fixes require user approval before applying. MINOR can be auto-applied. Never delete files, remove functionality, or make architectural changes without explicit approval.
+6. **Validate after fixing.** Run build/tests after code fixes. Revert any fix that breaks tests.
+7. **Prevent infinite loops.** Maximum 3 rounds. If unresolved by then, report as INCOMPLETE and stop.
+8. **Final output in tables.** Fixes, expert verdicts, and issue tracking must be scannable at a glance.
