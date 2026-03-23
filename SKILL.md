@@ -163,58 +163,105 @@ Tests: pass/fail (details)
 
 Track which expert's feedback was applied, and if not applied, why.
 
+### 4-5. MANDATORY: Proceed to Phase 5
+
+**After applying fixes, you MUST proceed to Phase 5 (re-review). NEVER skip directly to Phase 6.**
+
+The only valid path after Phase 4 is Phase 5. Phase 6 can ONLY be reached through Phase 5's termination conditions. This is non-negotiable — the entire value of this skill depends on the re-review loop confirming that fixes are correct.
+
 ---
 
-## Phase 5: Re-Review Loop (Automatic)
+## Phase 5: Re-Review Loop (MANDATORY)
 
-After fixes are applied, automatically run re-review. Do not wait for user approval.
+**This phase is NOT optional.** After every round of fixes, the SAME 5 experts MUST re-review the updated deliverable. Do not wait for user approval. Do not skip to Phase 6.
 
 ### 5-1. Re-Review Execution
 
-Spawn 5 Agents again simultaneously. This time include prior round context:
+Spawn the **same 5 experts** again simultaneously — same names, same personas, same specialties. They must be the identical team from Phase 3, not new experts. This continuity is critical: each expert needs to verify that their specific concerns were addressed.
+
+All 5 Agent calls MUST be in a single function_calls block, just like Phase 3. The prompt for each re-review agent:
 
 ```
-{base expert prompt}
+You are {name}. {background}.
+Specialty: {specialty}. When reviewing, you focus especially on {perspective}.
 
-## Previous Round Context
-Your previous issues:
-{list of previous issues}
+You are performing a RE-REVIEW. You reviewed this deliverable in Round {N-1} and raised issues.
+The team has applied fixes based on your feedback. Your job now is to:
+1. Verify each of your previous issues was properly addressed
+2. Check that the fixes didn't introduce new problems
+3. Review the full updated deliverable, not just the fixes
 
-Fixes applied:
-{fix details}
+## Updated Deliverable
+{full updated content — the CURRENT state after fixes, not just the diff}
 
-Verify the fixes are adequate and report any new issues.
+## Your Previous Issues (Round {N-1})
+{this expert's specific issues from the previous round}
+
+## Fixes Applied to Your Issues
+{specific fixes that addressed this expert's issues}
+
+## Output Format (strict JSON)
+{
+  "reviewer": "name",
+  "specialty": "specialty area",
+  "round": {N},
+  "summary": "one-line assessment of the updated deliverable",
+  "approval": "APPROVED | CHANGES_REQUESTED",
+  "previous_issues_status": [
+    {
+      "original_title": "the issue title from last round",
+      "resolved": true/false,
+      "comment": "how it was resolved, or why it's still an issue"
+    }
+  ],
+  "new_issues": [
+    {
+      "severity": "CRITICAL|MAJOR|MINOR|NITPICK",
+      "location": "file:line or section name",
+      "title": "issue title",
+      "description": "detailed description",
+      "suggestion": "specific fix suggestion"
+    }
+  ],
+  "confidence": 0.0-1.0
+}
 ```
 
-### 5-2. Termination Conditions
+### 5-2. After Re-Review Returns
 
-Stop the loop when ANY of these is met:
+When all 5 re-reviews return, check the termination conditions:
 
 | Condition | Result |
 |-----------|--------|
 | All 5 experts APPROVED | Success → Phase 6 |
-| 0 CRITICAL/MAJOR issues remaining | Success → Phase 6 |
+| 0 CRITICAL/MAJOR issues (new or unresolved) | Success → Phase 6 |
 | Round 3 reached | Report remaining issues → Phase 6 |
-| No new issues (only repeats from prior round) | → Phase 6 |
+| No new issues AND all previous issues resolved | Success → Phase 6 |
+| Unresolved or new CRITICAL/MAJOR issues exist | Apply fixes → re-run Phase 5 |
+
+**If termination conditions are NOT met:** apply fixes to the new/unresolved issues (same process as Phase 4), then loop back to Phase 5-1 for another re-review round with the same experts.
 
 ### 5-3. Deadlock Prevention
 
 - If 2 experts give conflicting opinions: follow the majority, or the higher confidence score.
 - If the same issue is flagged 2 rounds in a row without resolution: stop auto-fixing, escalate to the user.
+- Maximum 3 total rounds (1 initial review + 2 re-reviews). If still unresolved after round 3, proceed to Phase 6 with remaining issues documented.
 
 ---
 
 ## Phase 6: Final Report
 
+**You may ONLY reach this phase through Phase 5's termination conditions.** If you have not run at least one re-review round after applying fixes, go back to Phase 5.
+
 ```markdown
 ## MoE Review Complete
 
 ### Expert Team
-| Expert | Specialty | Final Verdict |
-|--------|----------|---------------|
-| Jun Park (ex-Cloudflare Security) | Security | ✅ APPROVED |
-| Sujin Kim (ex-Stripe Architect) | API Design | ✅ APPROVED |
-| ... | | |
+| Expert | Specialty | Round 1 | Final (Round N) |
+|--------|----------|---------|-----------------|
+| Jun Park (ex-Cloudflare Security) | Security | CHANGES_REQUESTED | ✅ APPROVED |
+| Sujin Kim (ex-Stripe Architect) | API Design | CHANGES_REQUESTED | ✅ APPROVED |
+| ... | | | |
 
 ### Fix Summary
 | # | Fix | Status |
@@ -241,8 +288,10 @@ For document deliverables, replace "Build/Tests" with appropriate checks (e.g., 
 ## Core Principles
 
 1. **Parallel execution is mandatory.** All 5 Agent calls in one function_calls block. This is the skill's reason for existence — never run sequentially.
-2. **Diversity > depth.** 5 different axes beat 5 experts in the same field.
-3. **Persona specificity determines review quality.** Name, former company, experience, specialty — the more specific, the deeper the review.
-4. **Auto-fix conservatively.** Fix clear bugs/errors immediately. Escalate design judgments to the user.
-5. **Prevent infinite loops.** Maximum 3 rounds. If unresolved by then, report and stop.
-6. **Final output in tables.** Fixes and expert verdicts must be scannable at a glance.
+2. **Re-review is mandatory.** After applying fixes, the SAME 5 experts MUST re-review. NEVER skip from Phase 4 to Phase 6. The path is always: Phase 3 (review) → Phase 4 (fix) → Phase 5 (re-review) → Phase 6 (report). Phase 5 may loop back to fix+re-review, but it is NEVER skipped.
+3. **Same experts throughout.** The 5 experts assembled in Phase 2 are the SAME team for every round. Do not swap, replace, or regenerate experts between rounds.
+4. **Diversity > depth.** 5 different axes beat 5 experts in the same field.
+5. **Persona specificity determines review quality.** Name, former company, experience, specialty — the more specific, the deeper the review.
+6. **Auto-fix conservatively.** Fix clear bugs/errors immediately. Escalate design judgments to the user.
+7. **Prevent infinite loops.** Maximum 3 rounds. If unresolved by then, report and stop.
+8. **Final output in tables.** Fixes and expert verdicts must be scannable at a glance.
