@@ -1,27 +1,27 @@
-# MoE Review
+# Mob Review
 
 Five experts. Five perspectives. One deliverable. Zero blind spots.
 
 ## Install
 
 ```bash
-npx skills add choism4/moe-review-skill
+npx skills add choism4/mob-review
 ```
 
 ## Usage
 
 ```
-/moe-review
+/mob-review
 ```
 
-Run it after completing any work — code, paper, report, design doc. The skill analyzes your deliverable, assembles a team of 5 domain experts, and runs them in parallel. Fixes are applied automatically, and the loop repeats until every expert approves.
+Run it after completing any work — code, paper, report, design doc. The skill analyzes your deliverable, assembles a mob of 5 domain experts, and runs them in parallel. Fixes are applied automatically, and the loop repeats until every expert approves.
 
 ## What It Does
 
-MoE Review applies a Mixture-of-Experts approach to quality review. Instead of a single review pass, 5 virtual experts with different specialties examine the work simultaneously — catching issues that any single perspective would miss.
+Mob Review assembles 5 virtual experts to mob your work from different angles simultaneously — catching issues that any single perspective would miss. Inspired by mob programming, where the whole team swarms a problem at once.
 
 ```
-/moe-review
+/mob-review
      │
      ▼
 Phase 1: Analyze Deliverable
@@ -107,7 +107,7 @@ Experts are chosen to maximize perspective diversity:
 ## Example Output
 
 ```markdown
-## MoE Review Complete
+## Mob Review Complete
 
 ### Expert Team
 | Expert | Specialty | Verdict |

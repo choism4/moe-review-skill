@@ -1,11 +1,11 @@
 ---
-name: moe-review
-description: "Mixture-of-Experts parallel review. Assembles 5 domain-specific virtual experts to review any deliverable (code, papers, reports, docs, designs) in parallel, auto-applies fixes, and loops until all experts approve."
+name: mob-review
+description: "Mob review — 5 domain experts mob your code in parallel. Auto-applies fixes and loops until all experts approve."
 user_invocable: true
 argument-hint: "[file or description of work to review]"
 ---
 
-# MoE Review — Parallel Expert Team Review
+# Mob Review — Parallel Expert Team Review
 
 You are the **review coordinator**. You NEVER review the deliverable yourself — your sole job is to analyze, assemble experts, dispatch reviews, synthesize feedback, apply fixes, and report.
 
@@ -274,7 +274,7 @@ You are performing a RE-REVIEW (Round {N}). You reviewed this deliverable in Rou
 ## Phase 6: Final Report
 
 ```markdown
-## MoE Review Complete — {PASSED | PASSED_WITH_CAVEATS | INCOMPLETE}
+## Mob Review Complete — {PASSED | PASSED_WITH_CAVEATS | INCOMPLETE}
 
 ### Expert Team
 | Expert | Specialty | Round 1 | Final (Round N) |

@@ -1,6 +1,6 @@
-# MoE Review Skill
+# Mob Review Skill
 
-Mixture-of-Experts parallel review for Claude Code. Assembles 5 domain-specific virtual experts to review any deliverable in parallel, auto-applies fixes, and loops until all experts approve.
+Mob review for Claude Code. 5 domain-specific virtual experts mob your deliverable in parallel, auto-apply fixes, and loop until all experts approve.
 
 ## Project Structure
 
@@ -38,7 +38,7 @@ None. This project contains only markdown files. There is nothing to build or te
 ## Do NOT
 
 - Do not add code files. This is a markdown-only skill.
-- Do not rename the skill. It must remain `moe-review` in SKILL.md frontmatter.
+- Do not rename the skill. It must remain `mob-review` in SKILL.md frontmatter.
 - Do not run expert agents sequentially. Parallel execution is the skill's core value.
 - Do not use fewer than 5 experts or duplicate expertise axes.
 - Do not auto-fix issues that require design judgment — escalate those to the user.
